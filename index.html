@@ -87,6 +87,24 @@
   .pod .pod-meta{ font-size:10px; color:var(--grey-text); line-height:1.3; margin:3px 0 9px; }
   .pod .pod-disks{ display:flex; flex-wrap:wrap; gap:6px; align-content:flex-start; }
 
+  /* CRONOLOGIA drawer */
+  .drawer-overlay{ position:fixed; inset:0; background:rgba(39,0,101,.28); opacity:0; pointer-events:none;
+    transition:opacity .2s; z-index:50; }
+  .drawer-overlay.open{ opacity:1; pointer-events:auto; }
+  .drawer{ position:fixed; top:0; right:0; height:100%; width:min(420px,92vw); background:var(--white);
+    box-shadow:-8px 0 30px rgba(0,0,0,.18); z-index:60; transform:translateX(100%); transition:transform .22s ease;
+    display:flex; flex-direction:column; }
+  .drawer.open{ transform:translateX(0); }
+  .drawer-head{ display:flex; align-items:center; gap:12px; padding:15px 18px; background:var(--bluette-900); color:var(--white);
+    font-family:var(--serif); font-size:17px; border-bottom:3px solid var(--lime); }
+  .drawer-head span{ flex:1 }
+  .drawer-close{ padding:4px 9px }
+  .drawer-body{ flex:1; overflow-y:auto; padding:10px 14px 30px; }
+  .hist-entry{ border-left:3px solid var(--bluette-400); padding:7px 0 7px 11px; margin:10px 0; }
+  .hist-time{ font-size:10.5px; text-transform:uppercase; letter-spacing:.6px; color:var(--bluette-700); font-weight:700; margin-bottom:3px; }
+  .hist-line{ font-size:12.5px; color:var(--black); line-height:1.45; }
+  .hist-empty{ color:var(--grey-text); font-style:italic; font-size:12.5px; padding:14px 2px; }
+
   @media (max-width:600px){
     main{ padding:16px 12px 50px }
     .grid{ grid-template-columns:1fr }
@@ -101,8 +119,18 @@
   </div>
   <div class="spacer"></div>
   <div class="saveind" id="saveind"><span class="dot"></span><span id="savetxt">connessione…</span></div>
+  <button class="btn" id="histBtn">Cronologia</button>
   <button class="btn" id="resetBtn">Reset</button>
 </header>
+
+<div class="drawer-overlay" id="histOverlay"></div>
+<aside class="drawer" id="histDrawer" aria-hidden="true">
+  <div class="drawer-head">
+    <span>Cronologia modifiche</span>
+    <button class="btn drawer-close" id="histClose" aria-label="Chiudi">✕</button>
+  </div>
+  <div class="drawer-body" id="histList"></div>
+</aside>
 
 <div class="setup-banner" id="setupBanner" style="display:none">
   <b>Modalità solo-questo-browser.</b> Firebase non è ancora configurato, quindi le modifiche restano salvate solo su questo dispositivo e non sono condivise.
@@ -127,7 +155,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getDatabase, ref, onValue, set, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  import { getDatabase, ref, onValue, set, push, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
   // ============================================================
   //  FIREBASE CONFIG  —  paste your project's web config here.
@@ -231,10 +259,42 @@
 
   // ---------- Persistence: Firebase Realtime DB (shared) + localStorage fallback ----------
   var STORE_KEY = "oe-assign-state-v3";
-  var db=null, stateRef=null;
-  var lastPushed=null;       // JSON of {placements,efforts} we last wrote — used to ignore our own echo
-  var pendingRemote=null;    // remote snapshot received while a drag is in progress
-  var initialApplied=false;  // have we rendered the first state yet?
+  var db=null, stateRef=null, historyRef=null;
+  var lastPushed=null;        // JSON of {placements,efforts} we last wrote — used to ignore our own echo
+  var pendingRemote=null;     // remote snapshot received while a drag is in progress
+  var initialApplied=false;   // have we rendered the first state yet?
+  var lastLoggedState=null;   // {placements,efforts} snapshot used to diff for the history log
+  var resetFlag=false;        // next save was triggered by a full reset
+
+  // map activity id -> display name, for readable history lines
+  var ACT_NAME={}; ACTS.forEach(function(a){ ACT_NAME[a.id]=a.name; });
+  function locLabel(loc){ return loc==="source" ? "Disponibili" : (ACT_NAME[loc]||loc); }
+  function snapshot(){ return JSON.parse(JSON.stringify({placements:placements, efforts:efforts})); }
+
+  // Build readable diff lines between two {placements,efforts} snapshots
+  function computeDiffLines(prev, curr){
+    var out=[];
+    Object.keys(curr.placements).forEach(function(id){
+      var person=id.split("_")[0];
+      var oldLoc=prev.placements?prev.placements[id]:undefined, newLoc=curr.placements[id];
+      if(oldLoc!==undefined && oldLoc!==newLoc){ out.push(person+" · "+locLabel(oldLoc)+" → "+locLabel(newLoc)); }
+      var oldEff=prev.efforts?prev.efforts[id]:undefined, newEff=curr.efforts[id];
+      if(oldEff!==undefined && newEff!==undefined && oldEff!==newEff){
+        var ctx=(newLoc&&newLoc!=="source")?" ("+locLabel(newLoc)+")":"";
+        out.push(person+" · effort "+EFFORT_LABEL[oldEff]+"→"+EFFORT_LABEL[newEff]+ctx);
+      }
+    });
+    return out;
+  }
+
+  // Append a history entry for whatever changed since lastLoggedState
+  function logHistory(){
+    var lines=null;
+    if(resetFlag){ resetFlag=false; lines=["Reset completo — dischetti riportati e effort azzerato"]; }
+    else if(lastLoggedState){ lines=computeDiffLines(lastLoggedState, {placements:placements, efforts:efforts}); }
+    lastLoggedState=snapshot();
+    if(lines && lines.length && historyRef){ try{ push(historyRef, {t:Date.now(), lines:lines}); }catch(e){ console.warn("[OE] history push failed:", e); } }
+  }
 
   function lsGet(){ try{ var v=window.localStorage.getItem(STORE_KEY); return v?JSON.parse(v):null; }catch(e){ return null; } }
   function lsSet(payload){ try{ window.localStorage.setItem(STORE_KEY, payload); return true; }catch(e){ return false; } }
@@ -251,6 +311,7 @@
     var snap = {placements:placements, efforts:efforts};
     lastPushed = JSON.stringify(snap);
     lsSet(lastPushed); // local copy regardless
+    logHistory();      // record what changed since the last save
     if(stateRef){
       try{ await set(stateRef, {placements:placements, efforts:efforts, updatedAt: Date.now()}); flashSaved("sincronizzato"); }
       catch(e){ console.error("[OE] write failed:", e); setOffline("offline — salvato in locale", "Scrittura fallita: "+(e&&(e.code||e.message)||e)); }
@@ -268,12 +329,22 @@
       if(!(id in efforts)) efforts[id]=2;
     });
     placeAllFromState();
+    lastLoggedState=snapshot(); // remote edits were already logged by their author
   }
 
   function initFirebase(){
     var app = initializeApp(firebaseConfig);
     db = getDatabase(app);
     stateRef = ref(db, "allocation/v3");
+    historyRef = ref(db, "allocation/history");
+
+    // live history feed (most recent 200 entries)
+    onValue(query(historyRef, limitToLast(200)), function(snap){
+      var v=snap.val()||{};
+      var entries=Object.keys(v).map(function(k){ return v[k]; });
+      entries.sort(function(a,b){ return (b.t||0)-(a.t||0); }); // newest first
+      renderHistory(entries);
+    }, function(err){ console.warn("[OE] history read failed:", err); });
 
     // connection indicator
     onValue(ref(db, ".info/connected"), function(s){
@@ -309,6 +380,7 @@
     else { placements=def.placements; efforts=def.efforts; }
     Object.keys(def.placements).forEach(function(id){ if(!(id in placements)) placements[id]="source"; if(!(id in efforts)) efforts[id]=2; });
     placeAllFromState();
+    lastLoggedState=snapshot();
     initialApplied=true;
   }
 
@@ -511,14 +583,43 @@
   // ---------- Controls ----------
   document.getElementById("resetBtn").addEventListener("click", function(){
     if(!confirm("Riportare tutti i dischetti nei contenitori delle persone e azzerare l'effort? Questo aggiorna lo stato condiviso per tutti.")) return;
-    var d=buildDefaults(); placements=d.placements; efforts=d.efforts; placeAllFromState(); scheduleSave();
+    var d=buildDefaults(); placements=d.placements; efforts=d.efforts; resetFlag=true; placeAllFromState(); scheduleSave();
   });
+
+  // ---------- Cronologia drawer ----------
+  function fmtTime(t){
+    if(!t) return "";
+    var d=new Date(t), now=new Date();
+    var hm=("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);
+    var sameDay=d.toDateString()===now.toDateString();
+    return sameDay ? ("oggi "+hm) : (("0"+d.getDate()).slice(-2)+"/"+("0"+(d.getMonth()+1)).slice(-2)+" "+hm);
+  }
+  function renderHistory(entries){
+    var box=document.getElementById("histList");
+    if(!entries || !entries.length){ box.innerHTML='<div class="hist-empty">Nessuna modifica registrata finora.</div>'; return; }
+    var html="";
+    entries.forEach(function(e){
+      var lines=(e.lines||[]).map(function(l){ return '<div class="hist-line">'+escapeHtml(l)+'</div>'; }).join("");
+      html+='<div class="hist-entry"><div class="hist-time">'+escapeHtml(fmtTime(e.t))+'</div>'+lines+'</div>';
+    });
+    box.innerHTML=html;
+  }
+  function escapeHtml(s){ return String(s).replace(/[&<>"]/g,function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
+
+  function openDrawer(){ document.getElementById("histDrawer").classList.add("open"); document.getElementById("histDrawer").setAttribute("aria-hidden","false"); document.getElementById("histOverlay").classList.add("open"); }
+  function closeDrawer(){ document.getElementById("histDrawer").classList.remove("open"); document.getElementById("histDrawer").setAttribute("aria-hidden","true"); document.getElementById("histOverlay").classList.remove("open"); }
+  document.getElementById("histBtn").addEventListener("click", openDrawer);
+  document.getElementById("histClose").addEventListener("click", closeDrawer);
+  document.getElementById("histOverlay").addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", function(e){ if(e.key==="Escape") closeDrawer(); });
 
   // ---------- Init ----------
   buildDiskColours();
   buildActivities();
   buildLegend();
   buildPeople();
+
+  renderHistory([]);
 
   if(isConfigured){
     try{ initFirebase(); }
