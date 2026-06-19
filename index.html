@@ -240,7 +240,7 @@
   function setStatus(t){ var el=document.getElementById("savetxt"); if(el) el.textContent=t; }
   function flashSaved(label){ var el=document.getElementById("saveind"); if(el){ el.classList.remove("offline"); el.classList.add("on"); } setStatus(label||"salvato");
     setTimeout(function(){ if(el) el.classList.remove("on"); }, 900); }
-  function setOffline(label){ var el=document.getElementById("saveind"); if(el){ el.classList.remove("on"); el.classList.add("offline"); } setStatus(label||"offline"); }
+  function setOffline(label, detail){ var el=document.getElementById("saveind"); if(el){ el.classList.remove("on"); el.classList.add("offline"); if(detail) el.title=detail; } setStatus(label||"offline"); }
 
   var saveTimer=null;
   function scheduleSave(){ setStatus("salvataggio…"); if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(doSave,200); }
@@ -251,7 +251,7 @@
     lsSet(lastPushed); // local copy regardless
     if(stateRef){
       try{ await set(stateRef, {placements:placements, efforts:efforts, updatedAt: Date.now()}); flashSaved("sincronizzato"); }
-      catch(e){ setOffline("offline — salvato in locale"); }
+      catch(e){ console.error("[OE] write failed:", e); setOffline("offline — salvato in locale", "Scrittura fallita: "+(e&&(e.code||e.message)||e)); }
     } else {
       flashSaved("salvato (solo questo browser)");
     }
@@ -275,8 +275,8 @@
 
     // connection indicator
     onValue(ref(db, ".info/connected"), function(s){
-      if(s.val()===true){ flashSaved("sincronizzato"); }
-      else { setOffline("riconnessione…"); }
+      if(s.val()===true){ console.log("[OE] Firebase connected"); flashSaved("sincronizzato"); }
+      else { console.warn("[OE] Firebase not connected (yet)"); setOffline("riconnessione…", "WebSocket non connesso. La rete potrebbe bloccare *.firebasedatabase.app"); }
     });
 
     onValue(stateRef, function(snapshot){
@@ -293,8 +293,9 @@
       applyRemote(val);
       initialApplied=true;
     }, function(err){
-      // permission denied or network error → fall back to local
-      setOffline("offline — solo locale");
+      // permission denied or listener cancelled → fall back to local
+      console.error("[OE] read listener cancelled:", err);
+      setOffline("offline — solo locale", "Lettura negata: "+(err&&(err.code||err.message)||err));
       if(!initialApplied){ bootLocal(); }
     });
   }
@@ -519,7 +520,7 @@
 
   if(isConfigured){
     try{ initFirebase(); }
-    catch(e){ setOffline("offline — solo locale"); bootLocal(); }
+    catch(e){ console.error("[OE] initFirebase threw:", e); setOffline("offline — solo locale", "Init Firebase fallita: "+(e&&(e.code||e.message)||e)); bootLocal(); }
   } else {
     document.getElementById("setupBanner").style.display="block";
     bootLocal();
