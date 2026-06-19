@@ -1,0 +1,527 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assegnazione attività · OpenEconomics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hedvig+Letters+Serif:opsz@12..24&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --white:#FFFFFF; --black:#000000;
+    --bluette-700:#4400B3; --bluette-800:#340088; --bluette-900:#270065;
+    --bluette-500:#6E1AFF; --bluette-400:#8742FF;
+    --lime:#B9FF69;
+    --grey-light:#F5F5F3; --grey-mid:#DDDDDA; --grey-text:#555555;
+    --serif:"Hedvig Letters Serif", Lora, Georgia, serif;
+    --sans:"Atkinson Hyperlegible", Poppins, system-ui, -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{ font-family:var(--sans); color:var(--grey-text); background:var(--grey-light); -webkit-font-smoothing:antialiased; }
+
+  header.topbar{
+    position:sticky; top:0; z-index:40; background:var(--bluette-900); color:var(--white);
+    padding:14px 22px; display:flex; align-items:center; gap:18px; border-bottom:3px solid var(--lime);
+  }
+  header.topbar h1{ font-family:var(--serif); font-weight:400; font-size:20px; margin:0; letter-spacing:.2px; }
+  header.topbar .sub{ font-size:12px; color:var(--grey-mid); margin-top:2px }
+  header.topbar .spacer{ flex:1 }
+  .saveind{ display:flex; align-items:center; gap:8px; font-size:12px; color:var(--grey-mid) }
+  .saveind .dot{ width:9px; height:9px; border-radius:50%; background:var(--lime); opacity:.35; transition:opacity .2s, background .2s }
+  .saveind.on .dot{ opacity:1 }
+  .saveind.offline .dot{ background:#FFAB00; opacity:1 }
+  .btn{ font-family:var(--sans); font-weight:700; font-size:12.5px; border:1px solid rgba(255,255,255,.45);
+    background:transparent; color:var(--white); padding:7px 13px; border-radius:8px; cursor:pointer; transition:background .15s; }
+  .btn:hover{ background:rgba(255,255,255,.12) }
+
+  /* Banner shown when Firebase is not configured yet */
+  .setup-banner{ background:#FFF4D6; border-bottom:1px solid #E8C766; color:#6b5400;
+    font-size:13px; padding:10px 22px; line-height:1.45; }
+  .setup-banner b{ color:#4a3a00 }
+  .setup-banner code{ font-family:ui-monospace,Menlo,Consolas,monospace; background:rgba(0,0,0,.06); padding:1px 5px; border-radius:4px; }
+
+  main{ padding:22px 22px 60px }
+  .section-label{ font-family:var(--sans); font-weight:700; text-transform:uppercase; letter-spacing:1.4px;
+    font-size:11.5px; color:var(--bluette-700); margin:6px 2px 12px; display:flex; align-items:center; gap:12px; }
+  .section-label::after{ content:""; flex:1; height:1px; background:var(--grey-mid) }
+  .section + .section{ margin-top:30px }
+
+  .grid{ display:grid; gap:14px; grid-template-columns:repeat(auto-fill, minmax(248px, 1fr)); }
+  .activity{ background:var(--white); border:1px solid var(--grey-mid); border-radius:14px; padding:13px 13px 11px;
+    min-height:118px; display:flex; flex-direction:column; box-shadow:0 1px 2px rgba(0,0,0,.05);
+    transition:box-shadow .15s, border-color .15s, outline-color .12s; }
+  .activity.dropok{ outline:2px dashed var(--bluette-500); outline-offset:2px; border-color:var(--bluette-500);
+    box-shadow:0 6px 18px rgba(68,0,179,.16); }
+  .activity .head{ display:flex; align-items:flex-start; gap:8px; margin-bottom:9px }
+  .activity .name{ font-family:var(--sans); font-weight:700; font-size:13.5px; color:var(--black); line-height:1.25; flex:1; }
+  .badge{ flex-shrink:0; display:flex; gap:6px; align-items:center; font-size:11px; color:var(--grey-text); }
+  .badge .chip{ background:var(--grey-light); border:1px solid var(--grey-mid); border-radius:20px; padding:2px 8px;
+    white-space:nowrap; font-family:var(--sans); font-weight:700; color:var(--bluette-700); }
+  .badge .chip.empty{ color:var(--grey-text); font-weight:400 }
+  .holder{ flex:1; display:flex; flex-wrap:wrap; gap:6px; align-content:flex-start; min-height:42px; border-radius:8px; padding:2px; }
+  .holder.empty::before{ content:"trascina qui i dischetti"; font-size:11px; color:var(--grey-mid); font-style:italic; align-self:center; margin:auto; }
+
+  /* DISCHETTI */
+  .disk{ width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-family:var(--sans); font-weight:700; font-size:12px; letter-spacing:.3px; cursor:grab; user-select:none;
+    touch-action:none; border:2px solid rgba(255,255,255,.65);
+    box-shadow:0 4px 9px rgba(0,0,0,.22), 0 1px 2px rgba(0,0,0,.18); transition:transform .12s ease, box-shadow .12s ease; }
+  .disk:hover{ transform:translateY(-3px); box-shadow:0 9px 18px rgba(0,0,0,.28) }
+  .disk.dragging{ cursor:grabbing; position:fixed; z-index:999; margin:0; transform:scale(1.18);
+    box-shadow:0 16px 34px rgba(0,0,0,.4); pointer-events:none; animation:none !important; }
+  .pod .disk{ animation:bob 3.4s ease-in-out infinite }
+  @keyframes bob{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-3px) } }
+
+  /* SORGENTE: persone in flusso pagina (la pagina scorre, non i box) */
+  .legend{ display:flex; flex-wrap:wrap; align-items:center; gap:16px; margin:0 2px 14px;
+    font-size:12px; color:var(--grey-text); }
+  .legend .grp{ display:flex; align-items:center; gap:7px }
+  .legend .legend-sw{ width:20px; height:20px; border-radius:50%; border:2px solid rgba(255,255,255,.65);
+    box-shadow:0 2px 5px rgba(0,0,0,.2); }
+  .legend .hint{ color:var(--grey-text); font-style:italic }
+  .people-grid{ display:grid; gap:12px; grid-template-columns:repeat(auto-fill, minmax(152px, 1fr)); }
+  .pod{ background:var(--white); border:1px solid var(--grey-mid); border-radius:12px; padding:10px 10px 11px;
+    display:flex; flex-direction:column; transition:outline-color .12s, box-shadow .12s; }
+  .pod.dropok{ outline:2px dashed var(--bluette-500); outline-offset:2px; box-shadow:0 6px 16px rgba(68,0,179,.14) }
+  .pod .pod-name{ font-family:var(--sans); font-weight:700; font-size:12.5px; color:var(--black); line-height:1.2; }
+  .pod .pod-meta{ font-size:10px; color:var(--grey-text); line-height:1.3; margin:3px 0 9px; }
+  .pod .pod-disks{ display:flex; flex-wrap:wrap; gap:6px; align-content:flex-start; }
+
+  @media (max-width:600px){
+    main{ padding:16px 12px 50px }
+    .grid{ grid-template-columns:1fr }
+  }
+</style>
+<style id="diskColors"></style>
+
+<header class="topbar">
+  <div>
+    <h1>Assegnazione attività</h1>
+    <div class="sub">Trascina per assegnare · tocca un dischetto per cambiare effort (Basso → Medio → Alto)</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="saveind" id="saveind"><span class="dot"></span><span id="savetxt">connessione…</span></div>
+  <button class="btn" id="resetBtn">Reset</button>
+</header>
+
+<div class="setup-banner" id="setupBanner" style="display:none">
+  <b>Modalità solo-questo-browser.</b> Firebase non è ancora configurato, quindi le modifiche restano salvate solo su questo dispositivo e non sono condivise.
+  Inserisci la configurazione Firebase in cima a <code>index.html</code> (oggetto <code>firebaseConfig</code>) per attivare la sincronizzazione condivisa in tempo reale.
+</div>
+
+<main>
+  <section class="section">
+    <div class="section-label">Commesse a mercato</div>
+    <div class="grid" id="grid-market"></div>
+  </section>
+  <section class="section">
+    <div class="section-label">Attività interne</div>
+    <div class="grid" id="grid-internal"></div>
+  </section>
+  <section class="section">
+    <div class="section-label">Persone</div>
+    <div class="legend" id="legend"></div>
+    <div class="people-grid" id="peopleGrid"></div>
+  </section>
+</main>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getDatabase, ref, onValue, set, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+  // ============================================================
+  //  FIREBASE CONFIG  —  paste your project's web config here.
+  //  How to get it:  Firebase console → Project settings → "Your apps"
+  //  → Web app → SDK setup and configuration → "Config".
+  //  These values are PUBLIC and safe to commit. Access is controlled
+  //  by the Realtime Database rules (see setup instructions).
+  // ============================================================
+  const firebaseConfig = {
+    apiKey:            "PASTE_API_KEY",
+    authDomain:        "PASTE_PROJECT_ID.firebaseapp.com",
+    databaseURL:       "https://PASTE_PROJECT_ID-default-rtdb.firebaseio.com",
+    projectId:         "PASTE_PROJECT_ID",
+    storageBucket:     "PASTE_PROJECT_ID.appspot.com",
+    messagingSenderId: "PASTE_SENDER_ID",
+    appId:             "PASTE_APP_ID"
+  };
+  const isConfigured = !JSON.stringify(firebaseConfig).includes("PASTE_");
+
+  "use strict";
+
+  var PEOPLE = ["JP","TS","LM","AB","EC","DJ","DA","FM","FC","MB","RM","SF","RS","IC","CC","FA"];
+
+  var COLORS = {
+    JP:"#4400B3", TS:"#6E1AFF", LM:"#2962FF", AB:"#00A3FF", EC:"#00BFA5", DJ:"#2E7D32",
+    DA:"#8D6E63", FM:"#B9FF69", FC:"#FFD600", MB:"#FFAB00", RM:"#FF6D00", SF:"#D50000",
+    RS:"#C2185B", IC:"#EC407A", CC:"#455A64", FA:"#880E4F"
+  };
+
+  var NAMES = {
+    JP:"John Paton", TS:"Thomas Steinkühler", LM:"Leonardo Mancini", AB:"Alessia Balla",
+    EC:"Emanuela Chessa", DJ:"Debarya Jana", DA:"Davide Antonelli", FM:"Federico Meschini",
+    FC:"Filippo Chiacchierini", MB:"Marco Benini", RM:"Raul De Maio", SF:"Sara Fiorini",
+    RS:"Riccardo Scialla", IC:"Ivan Ciolli", CC:"Claudio Cangiotti", FA:"Flavio Avallone"
+  };
+
+  var EFFORT_LABEL = {1:"Basso", 2:"Medio", 3:"Alto"};
+
+  var MARKET = [
+    "Zhero MedLink",
+    "CEF Digital Fastweb",
+    "CEF Energy SNAM-ENI",
+    "FVG t33 - Attività B2, D",
+    "Consorzio Bonifica Renana",
+    "Sponsorship FIFA-Lenovo POC",
+    "FIP - PadelEconomy",
+    "Comune di Policoro - Analisi scenari area industriale",
+    "ENI brand valuation update",
+    "AIRI",
+    "Interreg CE 28-34 Dashboard",
+    "Muzinich Climate Stress Test DIf II",
+    "FIFA U15 Festival SROI",
+    "Terna Update Impatto",
+    "Muzinich Mloan",
+    "Bilancio di Sostenibilità"
+  ];
+  var INTERNAL = [
+    "Progetto Scenari",
+    "Creazione KPI CBA Civiqa",
+    "Sviluppo Front End Civiqa",
+    "Nexternalytics (Progetto Calabria)",
+    "R&D interna",
+    "Civiqa (Ownership e sviluppo)"
+  ];
+
+  function slug(s){ return "act-"+s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,""); }
+  var ACTS = [];
+  MARKET.forEach(function(n){ ACTS.push({name:n, id:slug(n), market:true}); });
+  INTERNAL.forEach(function(n){ ACTS.push({name:n, id:slug(n), market:false}); });
+  var DISKS_PER_PERSON = ACTS.length;
+
+  function diskId(person, k){ return person + "#" + k; }
+
+  // ---------- Colour helpers ----------
+  function hexToRgb(h){ h=h.replace("#",""); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; }
+  function rgbToHex(r){ return "#"+r.map(function(x){ x=Math.round(Math.max(0,Math.min(255,x))); var s=x.toString(16); return s.length<2?"0"+s:s; }).join(""); }
+  function mix(c1,c2,t){ return c1.map(function(v,i){ return v+(c2[i]-v)*t; }); }
+  function lum(rgb){ var a=rgb.map(function(v){ v/=255; return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4); }); return 0.2126*a[0]+0.7152*a[1]+0.0722*a[2]; }
+  function textFor(rgb){ return lum(rgb)>0.5?"#000000":"#FFFFFF"; }
+  function shadeOf(base, eff){
+    if(eff===1) return mix(base,[255,255,255],0.45);
+    if(eff===3) return mix(base,[0,0,0],0.28);
+    return base.slice();
+  }
+
+  function buildDiskColours(){
+    var css="";
+    PEOPLE.forEach(function(p){
+      var base=hexToRgb(COLORS[p]);
+      for(var e=1;e<=3;e++){
+        var rgb=shadeOf(base,e);
+        css+='.disk[data-p="'+p+'"][data-eff="'+e+'"]{background:'+rgbToHex(rgb)+';color:'+textFor(rgb)+';}\n';
+      }
+    });
+    // legend swatches based on a neutral bluette
+    var lb=hexToRgb("#4400B3");
+    for(var e=1;e<=3;e++){ var rgb=shadeOf(lb,e); css+='.legend-sw[data-eff="'+e+'"]{background:'+rgbToHex(rgb)+';}\n'; }
+    document.getElementById("diskColors").textContent=css;
+  }
+
+  // ---------- Persistence: Firebase Realtime DB (shared) + localStorage fallback ----------
+  var STORE_KEY = "oe-assign-state-v3";
+  var db=null, stateRef=null;
+  var lastPushed=null;       // JSON of {placements,efforts} we last wrote — used to ignore our own echo
+  var pendingRemote=null;    // remote snapshot received while a drag is in progress
+  var initialApplied=false;  // have we rendered the first state yet?
+
+  function lsGet(){ try{ var v=window.localStorage.getItem(STORE_KEY); return v?JSON.parse(v):null; }catch(e){ return null; } }
+  function lsSet(payload){ try{ window.localStorage.setItem(STORE_KEY, payload); return true; }catch(e){ return false; } }
+
+  function setStatus(t){ var el=document.getElementById("savetxt"); if(el) el.textContent=t; }
+  function flashSaved(label){ var el=document.getElementById("saveind"); if(el){ el.classList.remove("offline"); el.classList.add("on"); } setStatus(label||"salvato");
+    setTimeout(function(){ if(el) el.classList.remove("on"); }, 900); }
+  function setOffline(label){ var el=document.getElementById("saveind"); if(el){ el.classList.remove("on"); el.classList.add("offline"); } setStatus(label||"offline"); }
+
+  var saveTimer=null;
+  function scheduleSave(){ setStatus("salvataggio…"); if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(doSave,200); }
+
+  async function doSave(){
+    var snap = {placements:placements, efforts:efforts};
+    lastPushed = JSON.stringify(snap);
+    lsSet(lastPushed); // local copy regardless
+    if(stateRef){
+      try{ await set(stateRef, {placements:placements, efforts:efforts, updatedAt: Date.now()}); flashSaved("sincronizzato"); }
+      catch(e){ setOffline("offline — salvato in locale"); }
+    } else {
+      flashSaved("salvato (solo questo browser)");
+    }
+  }
+
+  function applyRemote(val){
+    placements = val.placements || {};
+    efforts = val.efforts || {};
+    var def = buildDefaults();
+    Object.keys(def.placements).forEach(function(id){
+      if(!(id in placements)) placements[id]="source";
+      if(!(id in efforts)) efforts[id]=2;
+    });
+    placeAllFromState();
+  }
+
+  function initFirebase(){
+    var app = initializeApp(firebaseConfig);
+    db = getDatabase(app);
+    stateRef = ref(db, "allocation/v3");
+
+    // connection indicator
+    onValue(ref(db, ".info/connected"), function(s){
+      if(s.val()===true){ flashSaved("sincronizzato"); }
+      else { setOffline("riconnessione…"); }
+    });
+
+    onValue(stateRef, function(snapshot){
+      var val = snapshot.val();
+      if(!val || !val.placements){
+        // database is empty → seed it with defaults from this client
+        if(!initialApplied){ var d=buildDefaults(); placements=d.placements; efforts=d.efforts; placeAllFromState(); initialApplied=true; }
+        doSave();
+        return;
+      }
+      var incoming = JSON.stringify({placements:val.placements, efforts:val.efforts||{}});
+      if(incoming === lastPushed){ initialApplied=true; return; } // our own write echoed back
+      if(drag){ pendingRemote = val; return; }                   // don't disrupt an active drag
+      applyRemote(val);
+      initialApplied=true;
+    }, function(err){
+      // permission denied or network error → fall back to local
+      setOffline("offline — solo locale");
+      if(!initialApplied){ bootLocal(); }
+    });
+  }
+
+  function bootLocal(){
+    var saved = lsGet();
+    var def = buildDefaults();
+    if(saved && saved.placements){ placements=saved.placements; efforts=saved.efforts||{}; }
+    else { placements=def.placements; efforts=def.efforts; }
+    Object.keys(def.placements).forEach(function(id){ if(!(id in placements)) placements[id]="source"; if(!(id in efforts)) efforts[id]=2; });
+    placeAllFromState();
+    initialApplied=true;
+  }
+
+  // ---------- State ----------
+  var placements = {};  // diskId -> 'source' | activity id (slug)
+  var efforts = {};     // diskId -> 1|2|3
+  var diskEls = {};
+
+  function buildDefaults(){
+    var pl={}, ef={};
+    PEOPLE.forEach(function(person){
+      for(var k=0;k<DISKS_PER_PERSON;k++){ var id=diskId(person,k); pl[id]="source"; ef[id]=2; }
+    });
+    return {placements:pl, efforts:ef};
+  }
+
+  // ---------- DOM ----------
+  function makeDisk(person, k){
+    var id=diskId(person,k);
+    var d=document.createElement("div");
+    d.className="disk";
+    d.setAttribute("data-p",person);
+    d.setAttribute("data-id",id);
+    d.setAttribute("data-eff", String(efforts[id]||2));
+    d.textContent=person;
+    d.style.animationDelay=(Math.random()*-3.4).toFixed(2)+"s";
+    updateTitle(d);
+    attachDrag(d);
+    return d;
+  }
+  function updateTitle(d){
+    var p=d.getAttribute("data-p"); var e=d.getAttribute("data-eff");
+    var nm=NAMES[p] ? NAMES[p] : p;
+    d.title=nm+" · effort "+EFFORT_LABEL[e];
+  }
+
+  function buildActivities(){
+    var gm=document.getElementById("grid-market"), gi=document.getElementById("grid-internal");
+    ACTS.forEach(function(a){
+      var card=document.createElement("div");
+      card.className="activity"; card.setAttribute("data-zone",a.id);
+      card.innerHTML='<div class="head"><div class="name"></div><div class="badge"><span class="chip empty" data-badge>vuoto</span></div></div>'+
+        '<div class="holder empty" data-holder="'+a.id+'"></div>';
+      card.querySelector(".name").textContent=a.name;
+      (a.market?gm:gi).appendChild(card);
+    });
+  }
+
+  function buildLegend(){
+    var L=document.getElementById("legend");
+    var html="";
+    [1,2,3].forEach(function(e){ html+='<span class="grp"><span class="legend-sw" data-eff="'+e+'"></span>'+EFFORT_LABEL[e]+'</span>'; });
+    html+='<span class="hint">il colore più intenso = effort maggiore</span>';
+    L.innerHTML=html;
+  }
+
+  function buildPeople(){
+    var g=document.getElementById("peopleGrid");
+    PEOPLE.forEach(function(person){
+      var pod=document.createElement("div");
+      pod.className="pod"; pod.setAttribute("data-zone","source"); pod.setAttribute("data-person",person);
+      pod.innerHTML='<div class="pod-name">'+(NAMES[person]||person)+'</div>'+
+        '<div class="pod-meta" data-meta></div>'+
+        '<div class="pod-disks" data-pod-disks="'+person+'"></div>';
+      g.appendChild(pod);
+    });
+  }
+
+  function holderFor(loc, person){
+    if(loc==="source") return document.querySelector('[data-pod-disks="'+person+'"]');
+    return document.querySelector('[data-holder="'+loc+'"]');
+  }
+
+  function resortPod(person){
+    var pod=document.querySelector('[data-pod-disks="'+person+'"]');
+    var arr=Array.prototype.slice.call(pod.querySelectorAll(".disk"));
+    arr.sort(function(a,b){ return (+a.getAttribute("data-eff")) - (+b.getAttribute("data-eff")); });
+    arr.forEach(function(d){ pod.appendChild(d); });
+  }
+
+  function placeAllFromState(){
+    Object.keys(diskEls).forEach(function(id){ var e=diskEls[id]; if(e.parentNode) e.parentNode.removeChild(e); });
+    diskEls={};
+    PEOPLE.forEach(function(person){
+      for(var k=0;k<DISKS_PER_PERSON;k++){
+        var id=diskId(person,k);
+        if(!(id in efforts)) efforts[id]=2;
+        var el=makeDisk(person,k); diskEls[id]=el;
+        var loc=placements[id]||"source"; placements[id]=loc;
+        var h=holderFor(loc,person); if(!h){ h=holderFor("source",person); placements[id]="source"; }
+        h.appendChild(el);
+      }
+      resortPod(person);
+    });
+    refreshAllCounts();
+  }
+
+  function refreshAllCounts(){
+    ACTS.forEach(function(a){
+      var id=a.id; var holder=document.querySelector('[data-holder="'+id+'"]');
+      var disks=holder.querySelectorAll(".disk");
+      var ppl={}, eff=0;
+      disks.forEach(function(d){ ppl[d.getAttribute("data-p")]=1; eff+=(+d.getAttribute("data-eff")); });
+      var nPeople=Object.keys(ppl).length;
+      var badge=holder.closest(".activity").querySelector("[data-badge]");
+      if(disks.length===0){ badge.className="chip empty"; badge.textContent="vuoto"; holder.classList.add("empty"); }
+      else{ holder.classList.remove("empty"); badge.className="chip"; badge.textContent=nPeople+" pers · effort "+eff; }
+    });
+    PEOPLE.forEach(function(person){
+      var pod=document.querySelector('[data-pod-disks="'+person+'"]');
+      var remaining=pod.querySelectorAll(".disk").length;
+      var acts={};
+      ACTS.forEach(function(a){
+        var h=document.querySelector('[data-holder="'+a.id+'"]');
+        if(h.querySelector('.disk[data-p="'+person+'"]')) acts[a.id]=1;
+      });
+      pod.closest(".pod").querySelector("[data-meta]").innerHTML="rimasti <b>"+remaining+"</b><br>su "+Object.keys(acts).length+" att.";
+    });
+  }
+
+  // ---------- Drag & drop + tap-to-cycle effort ----------
+  var drag=null, lastZone=null;
+  function attachDrag(el){ el.addEventListener("pointerdown", onDown); }
+
+  function onDown(e){
+    if(e.button!==undefined && e.button!==0) return;
+    var el=e.currentTarget; e.preventDefault();
+    var rect=el.getBoundingClientRect();
+    drag={ el:el, origin:el.parentNode, offsetX:e.clientX-rect.left, offsetY:e.clientY-rect.top,
+      moved:false, startX:e.clientX, startY:e.clientY, w:rect.width, h:rect.height };
+    el.setPointerCapture(e.pointerId);
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerup", onUp);
+    el.addEventListener("pointercancel", onUp);
+  }
+  function onMove(e){
+    if(!drag) return;
+    var dx=e.clientX-drag.startX, dy=e.clientY-drag.startY;
+    if(!drag.moved && (Math.abs(dx)+Math.abs(dy)>4)){
+      drag.moved=true; drag.el.classList.add("dragging");
+      drag.el.style.width=drag.w+"px"; drag.el.style.height=drag.h+"px";
+    }
+    if(!drag.moved) return;
+    drag.el.style.left=(e.clientX-drag.offsetX)+"px";
+    drag.el.style.top=(e.clientY-drag.offsetY)+"px";
+    highlightUnder(e.clientX,e.clientY); autoScroll(e.clientY);
+  }
+  function zoneAt(x,y){ var el=document.elementFromPoint(x,y);
+    while(el && el!==document.body){ if(el.hasAttribute && el.hasAttribute("data-zone")) return el; el=el.parentNode; } return null; }
+  function highlightUnder(x,y){ var z=zoneAt(x,y); if(z===lastZone) return;
+    if(lastZone) lastZone.classList.remove("dropok"); if(z) z.classList.add("dropok"); lastZone=z; }
+  function autoScroll(y){ var m=80, vh=window.innerHeight;
+    if(y<m) window.scrollBy(0,-Math.ceil((m-y)/5)); else if(y>vh-m) window.scrollBy(0,Math.ceil((y-(vh-m))/5)); }
+
+  function cycleEffort(el){
+    var id=el.getAttribute("data-id");
+    var cur=+el.getAttribute("data-eff"); var next=(cur%3)+1;
+    efforts[id]=next; el.setAttribute("data-eff",String(next)); updateTitle(el);
+    if(placements[id]==="source") resortPod(el.getAttribute("data-p"));
+    refreshAllCounts(); scheduleSave();
+  }
+
+  function onUp(e){
+    if(!drag) return;
+    var el=drag.el;
+    el.removeEventListener("pointermove", onMove);
+    el.removeEventListener("pointerup", onUp);
+    el.removeEventListener("pointercancel", onUp);
+
+    if(!drag.moved){ cleanupDrag(); cycleEffort(el); maybeApplyPending(); return; }
+
+    var zone=zoneAt(e.clientX,e.clientY);
+    if(lastZone){ lastZone.classList.remove("dropok"); lastZone=null; }
+    var person=el.getAttribute("data-p"); var id=el.getAttribute("data-id"); var target;
+    if(zone){
+      var z=zone.getAttribute("data-zone");
+      if(z==="source"){ target=holderFor("source",person); placements[id]="source"; }
+      else{ target=document.querySelector('[data-holder="'+z+'"]'); placements[id]=z; }
+    }else{ target=drag.origin; }
+    el.classList.remove("dragging"); el.style.left=""; el.style.top=""; el.style.width=""; el.style.height="";
+    target.appendChild(el);
+    if(placements[id]==="source") resortPod(person);
+    cleanupDrag(); refreshAllCounts(); scheduleSave();
+    maybeApplyPending();
+  }
+  function cleanupDrag(){
+    if(drag && drag.el){ drag.el.classList.remove("dragging"); drag.el.style.left=""; drag.el.style.top=""; drag.el.style.width=""; drag.el.style.height=""; }
+    if(lastZone){ lastZone.classList.remove("dropok"); lastZone=null; }
+    drag=null;
+  }
+  // After a drag finishes, apply any remote update that arrived mid-drag
+  function maybeApplyPending(){
+    if(pendingRemote && !drag){
+      var val=pendingRemote; pendingRemote=null;
+      var incoming = JSON.stringify({placements:val.placements, efforts:val.efforts||{}});
+      if(incoming !== lastPushed) applyRemote(val);
+    }
+  }
+
+  // ---------- Controls ----------
+  document.getElementById("resetBtn").addEventListener("click", function(){
+    if(!confirm("Riportare tutti i dischetti nei contenitori delle persone e azzerare l'effort? Questo aggiorna lo stato condiviso per tutti.")) return;
+    var d=buildDefaults(); placements=d.placements; efforts=d.efforts; placeAllFromState(); scheduleSave();
+  });
+
+  // ---------- Init ----------
+  buildDiskColours();
+  buildActivities();
+  buildLegend();
+  buildPeople();
+
+  if(isConfigured){
+    try{ initFirebase(); }
+    catch(e){ setOffline("offline — solo locale"); bootLocal(); }
+  } else {
+    document.getElementById("setupBanner").style.display="block";
+    bootLocal();
+  }
+</script>
