@@ -1,6 +1,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Assegnazione attività · OpenEconomics</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23270065'/><circle cx='16' cy='16' r='8' fill='%23B9FF69'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Hedvig+Letters+Serif:opsz@12..24&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
@@ -198,7 +199,8 @@
   INTERNAL.forEach(function(n){ ACTS.push({name:n, id:slug(n), market:false}); });
   var DISKS_PER_PERSON = ACTS.length;
 
-  function diskId(person, k){ return person + "#" + k; }
+  // NB: keys are stored in Firebase, whose keys forbid . # $ / [ ] — so use "_" not "#".
+  function diskId(person, k){ return person + "_" + k; }
 
   // ---------- Colour helpers ----------
   function hexToRgb(h){ h=h.replace("#",""); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; }
