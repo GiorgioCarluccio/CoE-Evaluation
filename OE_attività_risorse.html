@@ -98,7 +98,7 @@
 
 <main>
   <section class="section">
-    <div class="section-label">Commesse a mercato</div>
+    <div class="section-label">Commesse</div>
     <div class="grid" id="grid-market"></div>
   </section>
   <section class="section">
@@ -116,26 +116,26 @@
 (function(){
   "use strict";
 
-  var PEOPLE = ["JP","TS","LM","AB","EC","DJ","DA","FM","FC","MB","RM","SF","RS","IC","CC","FA"];
+  var PEOPLE = ["JP","TS","LM","AB","EC","DJ","DA","FM","FC","MB","RM","SF","RS","IC","CC","FA","DF","PM"];
 
   var COLORS = {
     JP:"#4400B3", TS:"#6E1AFF", LM:"#2962FF", AB:"#00A3FF", EC:"#00BFA5", DJ:"#2E7D32",
     DA:"#8D6E63", FM:"#B9FF69", FC:"#FFD600", MB:"#FFAB00", RM:"#FF6D00", SF:"#D50000",
-    RS:"#C2185B", IC:"#EC407A", CC:"#455A64", FA:"#880E4F"
+    RS:"#C2185B", IC:"#EC407A", CC:"#455A64", FA:"#880E4F", DF:"#00838F", PM:"#7B1FA2"
   };
 
   var NAMES = {
     JP:"John Paton", TS:"Thomas Steinkühler", LM:"Leonardo Mancini", AB:"Alessia Balla",
     EC:"Emanuela Chessa", DJ:"Debarya Jana", DA:"Davide Antonelli", FM:"Federico Meschini",
     FC:"Filippo Chiacchierini", MB:"Marco Benini", RM:"Raul De Maio", SF:"Sara Fiorini",
-    RS:"Riccardo Scialla", IC:"Ivan Ciolli", CC:"Claudio Cangiotti", FA:"Flavio Avallone"
+    RS:"Riccardo Scialla", IC:"Ivan Ciolli", CC:"Claudio Cangiotti", FA:"Flavio Avallone",
+    DF:"Domenico Fuoco", PM:"Pierfrancesco Mercuri"
   };
 
   var EFFORT_LABEL = {1:"Basso", 2:"Medio", 3:"Alto"};
 
   var MARKET = [
     "Zhero MedLink",
-    "CEF Digital Fastweb",
     "CEF Energy SNAM-ENI",
     "FVG t33 - Attività B2, D",
     "Consorzio Bonifica Renana",
@@ -149,12 +149,15 @@
     "Terna Update Impatto",
     "Muzinich Mloan",
     "Compagnia San Paolo",
-    "Uniontrasporti"
+    {name:"UT- Corridoio Trans Mediterraneo", id:"act-uniontrasporti"}
   ];
   var INTERNAL = [
     "Progetto Scenari",
+    "DD Pjswitch",
+    "Progetti Monte Acuto - KI",
+    "Rendicontazione DNSH",
     "Creazione KPI CBA Civiqa",
-    "Sviluppo Front End Civiqa",
+    {name:"Supporto Civiqa", id:"act-sviluppo-front-end-civiqa"},
     "Nexternalytics (Progetto Calabria)",
     "R&D interna",
     "Civiqa (Ownership e sviluppo)",
@@ -163,8 +166,13 @@
 
   function slug(s){ return "act-"+s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,""); }
   var ACTS = [];
-  MARKET.forEach(function(n){ ACTS.push({name:n, id:slug(n), market:true}); });
-  INTERNAL.forEach(function(n){ ACTS.push({name:n, id:slug(n), market:false}); });
+  function addActivity(entry, market){
+    var name = typeof entry==="string" ? entry : entry.name;
+    var id = typeof entry==="string" ? slug(name) : entry.id;
+    ACTS.push({name:name, id:id, market:market});
+  }
+  MARKET.forEach(function(n){ addActivity(n, true); });
+  INTERNAL.forEach(function(n){ addActivity(n, false); });
   var DISKS_PER_PERSON = ACTS.length;
 
   function diskId(person, k){ return person + "#" + k; }
