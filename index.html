@@ -57,10 +57,19 @@
   .activity{ background:var(--white); border:1px solid var(--grey-mid); border-radius:14px; padding:13px 13px 11px;
     min-height:118px; display:flex; flex-direction:column; box-shadow:0 1px 2px rgba(0,0,0,.05);
     transition:box-shadow .15s, border-color .15s, outline-color .12s; }
+  .activity[data-status="early-stage"]{ border-left:4px solid #9E9E9E; }
+  .activity[data-status="iniziata"]{ border-left:4px solid #2962FF; }
+  .activity[data-status="ongoing"]{ border-left:4px solid #FFAB00; }
+  .activity[data-status="near-complete"]{ border-left:4px solid #7E57C2; }
+  .activity[data-status="done"]{ border-left:4px solid #2E7D32; }
   .activity.dropok{ outline:2px dashed var(--bluette-500); outline-offset:2px; border-color:var(--bluette-500);
     box-shadow:0 6px 18px rgba(68,0,179,.16); }
   .activity .head{ display:flex; align-items:flex-start; gap:8px; margin-bottom:9px }
   .activity .name{ font-family:var(--sans); font-weight:700; font-size:13.5px; color:var(--black); line-height:1.25; flex:1; }
+  .status{ display:flex; align-items:center; gap:6px; margin:-1px 0 8px; font-size:11px; color:var(--grey-text); }
+  .status span{ font-weight:700; }
+  .status-select{ flex:1; min-width:0; appearance:auto; font:700 11px var(--sans); color:var(--bluette-900); background:var(--grey-light);
+    border:1px solid var(--grey-mid); border-radius:6px; padding:3px 5px; cursor:pointer; }
   .badge{ flex-shrink:0; display:flex; gap:6px; align-items:center; font-size:11px; color:var(--grey-text); }
   .badge .chip{ background:var(--grey-light); border:1px solid var(--grey-mid); border-radius:20px; padding:2px 8px;
     white-space:nowrap; font-family:var(--sans); font-weight:700; color:var(--bluette-700); }
@@ -80,12 +89,6 @@
   @keyframes bob{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-3px) } }
 
   /* SORGENTE: persone in flusso pagina (la pagina scorre, non i box) */
-  .legend{ display:flex; flex-wrap:wrap; align-items:center; gap:16px; margin:0 2px 14px;
-    font-size:12px; color:var(--grey-text); }
-  .legend .grp{ display:flex; align-items:center; gap:7px }
-  .legend .legend-sw{ width:20px; height:20px; border-radius:50%; border:2px solid rgba(255,255,255,.65);
-    box-shadow:0 2px 5px rgba(0,0,0,.2); }
-  .legend .hint{ color:var(--grey-text); font-style:italic }
   .people-grid{ display:grid; gap:12px; grid-template-columns:repeat(auto-fill, minmax(152px, 1fr)); }
   .pod{ background:var(--white); border:1px solid var(--grey-mid); border-radius:12px; padding:10px 10px 11px;
     display:flex; flex-direction:column; transition:outline-color .12s, box-shadow .12s; }
@@ -155,7 +158,6 @@
   </section>
   <section class="section">
     <div class="section-label">Persone</div>
-    <div class="legend" id="legend"></div>
     <div class="people-grid" id="peopleGrid"></div>
   </section>
 </main>
@@ -184,23 +186,31 @@
 
   "use strict";
 
-  var PEOPLE = ["JP","TS","LM","AB","EC","DJ","DA","FM","FC","MB","RM","SF","RS","IC","CC","FA","DF","PM"];
+  var PEOPLE = ["JP","TS","LM","AB","EC","DJ","DA","FM","FC","MB","RM","SF","RS","IC","FA","DF","PM"];
 
   var COLORS = {
     JP:"#4400B3", TS:"#6E1AFF", LM:"#2962FF", AB:"#00A3FF", EC:"#00BFA5", DJ:"#2E7D32",
     DA:"#8D6E63", FM:"#B9FF69", FC:"#FFD600", MB:"#FFAB00", RM:"#FF6D00", SF:"#D50000",
-    RS:"#C2185B", IC:"#EC407A", CC:"#455A64", FA:"#880E4F", DF:"#00838F", PM:"#7B1FA2"
+    RS:"#C2185B", IC:"#EC407A", FA:"#880E4F", DF:"#00838F", PM:"#7B1FA2"
   };
 
   var NAMES = {
     JP:"John Paton", TS:"Thomas Steinkühler", LM:"Leonardo Mancini", AB:"Alessia Balla",
     EC:"Emanuela Chessa", DJ:"Debarya Jana", DA:"Davide Antonelli", FM:"Federico Meschini",
     FC:"Filippo Chiacchierini", MB:"Marco Benini", RM:"Raul De Maio", SF:"Sara Fiorini",
-    RS:"Riccardo Scialla", IC:"Ivan Ciolli", CC:"Claudio Cangiotti", FA:"Flavio Avallone",
+    RS:"Riccardo Scialla", IC:"Ivan Ciolli", FA:"Flavio Avallone",
     DF:"Domenico Fuoco", PM:"Pierfrancesco Mercuri"
   };
 
   var EFFORT_LABEL = {1:"Basso", 2:"Medio", 3:"Alto"};
+  var STATUS_OPTIONS = [
+    {id:"early-stage", label:"early stage"},
+    {id:"iniziata", label:"iniziata"},
+    {id:"ongoing", label:"ongoing"},
+    {id:"near-complete", label:"near complete"},
+    {id:"done", label:"done"}
+  ];
+  var STATUS_LABEL = {}; STATUS_OPTIONS.forEach(function(status){ STATUS_LABEL[status.id]=status.label; });
 
   // La classificazione vive qui: per spostare una commessa basta cambiarne il settore.
   var SECTORS = [
@@ -235,7 +245,7 @@
   ];
   var MARKET_SECTORS = {
     "Zhero MedLink":"industry-utilities",
-    "CEF Energy SNAM-ENI":"enel-terna",
+    "CEF Energy SNAM-ENI":"industry-utilities",
     "FVG t33 - Attività B2, D":"pal-nord",
     "Consorzio Bonifica Renana":"industry-utilities",
     "Sponsorship FIFA-Lenovo POC":"sport-finance-culture",
@@ -253,7 +263,7 @@
     "Rendicontazione DNSH":"industry-utilities",
     "AGEA":"pac-pal-centro-sud",
     "CDP Venture Capital":"sport-finance-culture",
-    "act-uniontrasporti":"industry-utilities"
+    "act-uniontrasporti":"sport-finance-culture"
   };
   var INTERNAL = [
     "Progetto Scenari",
@@ -281,44 +291,31 @@
 
   // ---------- Colour helpers ----------
   function hexToRgb(h){ h=h.replace("#",""); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; }
-  function rgbToHex(r){ return "#"+r.map(function(x){ x=Math.round(Math.max(0,Math.min(255,x))); var s=x.toString(16); return s.length<2?"0"+s:s; }).join(""); }
-  function mix(c1,c2,t){ return c1.map(function(v,i){ return v+(c2[i]-v)*t; }); }
   function lum(rgb){ var a=rgb.map(function(v){ v/=255; return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4); }); return 0.2126*a[0]+0.7152*a[1]+0.0722*a[2]; }
   function textFor(rgb){ return lum(rgb)>0.5?"#000000":"#FFFFFF"; }
-  function shadeOf(base, eff){
-    if(eff===1) return mix(base,[255,255,255],0.45);
-    if(eff===3) return mix(base,[0,0,0],0.28);
-    return base.slice();
-  }
 
   function buildDiskColours(){
     var css="";
     PEOPLE.forEach(function(p){
       var base=hexToRgb(COLORS[p]);
-      for(var e=1;e<=3;e++){
-        var rgb=shadeOf(base,e);
-        css+='.disk[data-p="'+p+'"][data-eff="'+e+'"]{background:'+rgbToHex(rgb)+';color:'+textFor(rgb)+';}\n';
-      }
+      css+='.disk[data-p="'+p+'"][data-eff]{background:'+COLORS[p]+';color:'+textFor(base)+';}\n';
     });
-    // legend swatches based on a neutral bluette
-    var lb=hexToRgb("#4400B3");
-    for(var e=1;e<=3;e++){ var rgb=shadeOf(lb,e); css+='.legend-sw[data-eff="'+e+'"]{background:'+rgbToHex(rgb)+';}\n'; }
     document.getElementById("diskColors").textContent=css;
   }
 
   // ---------- Persistence: Firebase Realtime DB (shared) + localStorage fallback ----------
   var STORE_KEY = "oe-assign-state-v3";
   var db=null, stateRef=null, historyRef=null;
-  var lastPushed=null;        // JSON of {placements,efforts} we last wrote — used to ignore our own echo
+  var lastPushed=null;        // JSON of the state we last wrote — used to ignore our own echo
   var pendingRemote=null;     // remote snapshot received while a drag is in progress
   var initialApplied=false;   // have we rendered the first state yet?
-  var lastLoggedState=null;   // {placements,efforts} snapshot used to diff for the history log
+  var lastLoggedState=null;   // snapshot used to diff for the history log
   var resetFlag=false;        // next save was triggered by a full reset
 
   // map activity id -> display name, for readable history lines
   var ACT_NAME={}; ACTS.forEach(function(a){ ACT_NAME[a.id]=a.name; });
   function locLabel(loc){ return loc==="source" ? "Disponibili" : (ACT_NAME[loc]||loc); }
-  function snapshot(){ return JSON.parse(JSON.stringify({placements:placements, efforts:efforts})); }
+  function snapshot(){ return JSON.parse(JSON.stringify({placements:placements, efforts:efforts, statuses:statuses})); }
 
   // Build readable diff lines between two {placements,efforts} snapshots
   function computeDiffLines(prev, curr){
@@ -333,6 +330,12 @@
         out.push(person+" · effort "+EFFORT_LABEL[oldEff]+"→"+EFFORT_LABEL[newEff]+ctx);
       }
     });
+    ACTS.forEach(function(activity){
+      var oldStatus=(prev.statuses||{})[activity.id], newStatus=(curr.statuses||{})[activity.id];
+      if(oldStatus!==undefined && newStatus!==undefined && oldStatus!==newStatus){
+        out.push(activity.name+" · stato "+STATUS_LABEL[oldStatus]+"→"+STATUS_LABEL[newStatus]);
+      }
+    });
     return out;
   }
 
@@ -340,7 +343,7 @@
   function logHistory(){
     var lines=null;
     if(resetFlag){ resetFlag=false; lines=["Reset completo — dischetti riportati e effort azzerato"]; }
-    else if(lastLoggedState){ lines=computeDiffLines(lastLoggedState, {placements:placements, efforts:efforts}); }
+    else if(lastLoggedState){ lines=computeDiffLines(lastLoggedState, snapshot()); }
     lastLoggedState=snapshot();
     if(lines && lines.length && historyRef){ try{ push(historyRef, {t:Date.now(), lines:lines}); }catch(e){ console.warn("[OE] history push failed:", e); } }
   }
@@ -357,12 +360,12 @@
   function scheduleSave(){ setStatus("salvataggio…"); if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(doSave,200); }
 
   async function doSave(){
-    var snap = {placements:placements, efforts:efforts};
+    var snap = {placements:placements, efforts:efforts, statuses:statuses};
     lastPushed = JSON.stringify(snap);
     lsSet(lastPushed); // local copy regardless
     logHistory();      // record what changed since the last save
     if(stateRef){
-      try{ await set(stateRef, {placements:placements, efforts:efforts, updatedAt: Date.now()}); flashSaved("sincronizzato"); }
+      try{ await set(stateRef, {placements:placements, efforts:efforts, statuses:statuses, updatedAt: Date.now()}); flashSaved("sincronizzato"); }
       catch(e){ console.error("[OE] write failed:", e); setOffline("offline — salvato in locale", "Scrittura fallita: "+(e&&(e.code||e.message)||e)); }
     } else {
       flashSaved("salvato (solo questo browser)");
@@ -372,13 +375,19 @@
   function applyRemote(val){
     placements = val.placements || {};
     efforts = val.efforts || {};
+    statuses = val.statuses || {};
+    var cleaned=pruneRemovedPeople();
     var def = buildDefaults();
     Object.keys(def.placements).forEach(function(id){
       if(!(id in placements)) placements[id]="source";
       if(!(id in efforts)) efforts[id]=2;
     });
+    ACTS.forEach(function(activity){
+      if(!STATUS_LABEL[statuses[activity.id]]){ statuses[activity.id]="early-stage"; cleaned=true; }
+    });
     placeAllFromState();
     lastLoggedState=snapshot(); // remote edits were already logged by their author
+    return cleaned;
   }
 
   function initFirebase(){
@@ -405,15 +414,16 @@
       var val = snapshot.val();
       if(!val || !val.placements){
         // database is empty → seed it with defaults from this client
-        if(!initialApplied){ var d=buildDefaults(); placements=d.placements; efforts=d.efforts; placeAllFromState(); initialApplied=true; }
+        if(!initialApplied){ var d=buildDefaults(); placements=d.placements; efforts=d.efforts; statuses=d.statuses; placeAllFromState(); initialApplied=true; }
         doSave();
         return;
       }
-      var incoming = JSON.stringify({placements:val.placements, efforts:val.efforts||{}});
+      var incoming = JSON.stringify({placements:val.placements, efforts:val.efforts||{}, statuses:val.statuses||{}});
       if(incoming === lastPushed){ initialApplied=true; return; } // our own write echoed back
       if(drag){ pendingRemote = val; return; }                   // don't disrupt an active drag
-      applyRemote(val);
+      var cleaned=applyRemote(val);
       initialApplied=true;
+      if(cleaned) scheduleSave();
     }, function(err){
       // permission denied or listener cancelled → fall back to local
       console.error("[OE] read listener cancelled:", err);
@@ -425,9 +435,11 @@
   function bootLocal(){
     var saved = lsGet();
     var def = buildDefaults();
-    if(saved && saved.placements){ placements=saved.placements; efforts=saved.efforts||{}; }
-    else { placements=def.placements; efforts=def.efforts; }
+    if(saved && saved.placements){ placements=saved.placements; efforts=saved.efforts||{}; statuses=saved.statuses||{}; }
+    else { placements=def.placements; efforts=def.efforts; statuses=def.statuses; }
+    pruneRemovedPeople();
     Object.keys(def.placements).forEach(function(id){ if(!(id in placements)) placements[id]="source"; if(!(id in efforts)) efforts[id]=2; });
+    ACTS.forEach(function(activity){ if(!STATUS_LABEL[statuses[activity.id]]) statuses[activity.id]="early-stage"; });
     placeAllFromState();
     lastLoggedState=snapshot();
     initialApplied=true;
@@ -436,14 +448,27 @@
   // ---------- State ----------
   var placements = {};  // diskId -> 'source' | activity id (slug)
   var efforts = {};     // diskId -> 1|2|3
+  var statuses = {};    // activity id -> status id
   var diskEls = {};
 
   function buildDefaults(){
-    var pl={}, ef={};
+    var pl={}, ef={}, st={};
     PEOPLE.forEach(function(person){
       for(var k=0;k<DISKS_PER_PERSON;k++){ var id=diskId(person,k); pl[id]="source"; ef[id]=2; }
     });
-    return {placements:pl, efforts:ef};
+    ACTS.forEach(function(activity){ st[activity.id]="early-stage"; });
+    return {placements:pl, efforts:ef, statuses:st};
+  }
+
+  function pruneRemovedPeople(){
+    var changed=false;
+    Object.keys(placements).forEach(function(id){
+      if(PEOPLE.indexOf(id.split("_")[0])===-1){ delete placements[id]; changed=true; }
+    });
+    Object.keys(efforts).forEach(function(id){
+      if(PEOPLE.indexOf(id.split("_")[0])===-1){ delete efforts[id]; changed=true; }
+    });
+    return changed;
   }
 
   // ---------- DOM ----------
@@ -482,18 +507,16 @@
       var card=document.createElement("div");
       card.className="activity"; card.setAttribute("data-zone",a.id);
       card.innerHTML='<div class="head"><div class="name"></div><div class="badge"><span class="chip empty" data-badge>vuoto</span></div></div>'+
+        '<label class="status"><span>Stato</span><select class="status-select" data-status-select aria-label="Stato commessa"></select></label>'+
         '<div class="holder empty" data-holder="'+a.id+'"></div>';
       card.querySelector(".name").textContent=a.name;
+      var select=card.querySelector("[data-status-select]");
+      select.innerHTML=STATUS_OPTIONS.map(function(status){ return '<option value="'+status.id+'">'+status.label+'</option>'; }).join("");
+      select.value=statuses[a.id]||"early-stage";
+      select.addEventListener("change", function(){ statuses[a.id]=select.value; card.setAttribute("data-status", select.value); scheduleSave(); });
+      card.setAttribute("data-status", select.value);
       (a.market ? grids[a.sector] : gi).appendChild(card);
     });
-  }
-
-  function buildLegend(){
-    var L=document.getElementById("legend");
-    var html="";
-    [1,2,3].forEach(function(e){ html+='<span class="grp"><span class="legend-sw" data-eff="'+e+'"></span>'+EFFORT_LABEL[e]+'</span>'; });
-    html+='<span class="hint">il colore più intenso = effort maggiore</span>';
-    L.innerHTML=html;
   }
 
   function buildPeople(){
@@ -540,11 +563,13 @@
   function refreshAllCounts(){
     ACTS.forEach(function(a){
       var id=a.id; var holder=document.querySelector('[data-holder="'+id+'"]');
+      var card=holder.closest(".activity"), select=card.querySelector("[data-status-select]");
+      select.value=statuses[id]||"early-stage"; card.setAttribute("data-status", select.value);
       var disks=holder.querySelectorAll(".disk");
       var ppl={}, eff=0;
       disks.forEach(function(d){ ppl[d.getAttribute("data-p")]=1; eff+=(+d.getAttribute("data-eff")); });
       var nPeople=Object.keys(ppl).length;
-      var badge=holder.closest(".activity").querySelector("[data-badge]");
+      var badge=card.querySelector("[data-badge]");
       if(disks.length===0){ badge.className="chip empty"; badge.textContent="vuoto"; holder.classList.add("empty"); }
       else{ holder.classList.remove("empty"); badge.className="chip"; badge.textContent=nPeople+" pers · effort "+eff; }
     });
@@ -634,8 +659,8 @@
   function maybeApplyPending(){
     if(pendingRemote && !drag){
       var val=pendingRemote; pendingRemote=null;
-      var incoming = JSON.stringify({placements:val.placements, efforts:val.efforts||{}});
-      if(incoming !== lastPushed) applyRemote(val);
+      var incoming = JSON.stringify({placements:val.placements, efforts:val.efforts||{}, statuses:val.statuses||{}});
+      if(incoming !== lastPushed && applyRemote(val)) scheduleSave();
     }
   }
 
@@ -675,7 +700,6 @@
   // ---------- Init ----------
   buildDiskColours();
   buildActivities();
-  buildLegend();
   buildPeople();
 
   renderHistory([]);

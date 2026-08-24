@@ -65,6 +65,6 @@ Share that URL with external users for read/monitor; they can also edit (open ed
 
 - The old standalone file `OE_attività_risorse.html` is kept as a backup; it is **not**
   shared-state. The live, synced version is `index.html`.
-- State is stored in the database under `allocation/v3` as `{ placements, efforts, updatedAt }`.
+- State is stored in the database under `allocation/v3` as `{ placements, efforts, statuses, updatedAt }`.
 - The status pill in the header shows: *sincronizzato* (synced), *salvataggio…* (saving),
   or *offline* (network/rules issue — changes fall back to local storage).
