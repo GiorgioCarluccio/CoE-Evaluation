@@ -4,7 +4,7 @@ Live dashboard to allocate people to activities, with shared real-time state.
 The published page is [`index.html`](index.html).
 
 - **Viewers**: open the public URL and see the current allocation, updating live.
-- **Editing**: anyone can drag disks and tap to change effort — changes sync to everyone instantly.
+- **Editing**: anyone can open the **Persone** side menu and drag disks onto activities — changes sync to everyone instantly.
 - **Hosting**: GitHub Pages (static). Shared state lives in **Firebase Realtime Database**.
 
 > Until Firebase is configured, the page runs in *local-only* mode (a yellow banner shows):
@@ -65,6 +65,6 @@ Share that URL with external users for read/monitor; they can also edit (open ed
 
 - The old standalone file `OE_attività_risorse.html` is kept as a backup; it is **not**
   shared-state. The live, synced version is `index.html`.
-- State is stored in the database under `allocation/v3` as `{ placements, efforts, statuses, updatedAt }`.
+- State is stored in the database under `allocation/v3` as `{ placements, statuses, updatedAt }`.
 - The status pill in the header shows: *sincronizzato* (synced), *salvataggio…* (saving),
   or *offline* (network/rules issue — changes fall back to local storage).

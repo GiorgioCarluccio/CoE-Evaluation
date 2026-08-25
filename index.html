@@ -45,7 +45,9 @@
     font-size:11.5px; color:var(--bluette-700); margin:6px 2px 12px; display:flex; align-items:center; gap:12px; }
   .section-label::after{ content:""; flex:1; height:1px; background:var(--grey-mid) }
   .section + .section{ margin-top:30px }
-  .sector + .sector{ margin-top:24px }
+  #sectorGrids{ display:grid; grid-template-columns:repeat(5, minmax(248px, 1fr)); gap:16px; align-items:start; overflow-x:auto; padding-bottom:6px; }
+  .sector{ min-width:0; }
+  .sector + .sector{ margin-top:0 }
   .sector-head{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; margin:0 2px 10px; }
   .sector-title{ font-family:var(--serif); font-size:18px; font-weight:400; color:var(--bluette-900); }
   .sector-partners{ display:flex; flex-wrap:wrap; align-items:center; gap:5px; font-size:11px; color:var(--grey-text); }
@@ -54,6 +56,7 @@
     border-radius:20px; padding:2px 8px; font-weight:700; }
 
   .grid{ display:grid; gap:14px; grid-template-columns:repeat(auto-fill, minmax(248px, 1fr)); }
+  .sector .grid{ display:flex; flex-direction:column; }
   .activity{ background:var(--white); border:1px solid var(--grey-mid); border-radius:14px; padding:13px 13px 11px;
     min-height:118px; display:flex; flex-direction:column; box-shadow:0 1px 2px rgba(0,0,0,.05);
     transition:box-shadow .15s, border-color .15s, outline-color .12s; }
@@ -88,7 +91,7 @@
   .pod .disk{ animation:bob 3.4s ease-in-out infinite }
   @keyframes bob{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-3px) } }
 
-  /* SORGENTE: persone in flusso pagina (la pagina scorre, non i box) */
+  /* SORGENTE: persone nel drawer laterale */
   .people-grid{ display:grid; gap:12px; grid-template-columns:repeat(auto-fill, minmax(152px, 1fr)); }
   .pod{ background:var(--white); border:1px solid var(--grey-mid); border-radius:12px; padding:10px 10px 11px;
     display:flex; flex-direction:column; transition:outline-color .12s, box-shadow .12s; }
@@ -105,6 +108,10 @@
     box-shadow:-8px 0 30px rgba(0,0,0,.18); z-index:60; transform:translateX(100%); transition:transform .22s ease;
     display:flex; flex-direction:column; }
   .drawer.open{ transform:translateX(0); }
+  .people-drawer{ left:0; right:auto; width:min(430px,92vw); transform:translateX(-100%); box-shadow:8px 0 30px rgba(0,0,0,.18); }
+  .people-drawer.open{ transform:translateX(0); }
+  .people-drawer .drawer-body{ padding:16px 18px 30px; }
+  .people-drawer .people-grid{ grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); }
   .drawer-head{ display:flex; align-items:center; gap:12px; padding:15px 18px; background:var(--bluette-900); color:var(--white);
     font-family:var(--serif); font-size:17px; border-bottom:3px solid var(--lime); }
   .drawer-head span{ flex:1 }
@@ -118,6 +125,7 @@
   @media (max-width:600px){
     main{ padding:16px 12px 50px }
     .grid{ grid-template-columns:1fr }
+    #sectorGrids{ grid-template-columns:repeat(5, minmax(230px, 1fr)); }
   }
 </style>
 <style id="diskColors"></style>
@@ -125,10 +133,11 @@
 <header class="topbar">
   <div>
     <h1>Assegnazione attività</h1>
-    <div class="sub">Trascina per assegnare · tocca un dischetto per cambiare effort (Basso → Medio → Alto)</div>
+    <div class="sub">Trascina i dischetti dal menù Persone per assegnarli alle attività</div>
   </div>
   <div class="spacer"></div>
   <div class="saveind" id="saveind"><span class="dot"></span><span id="savetxt">connessione…</span></div>
+  <button class="btn" id="peopleBtn" aria-controls="peopleDrawer" aria-expanded="false">Persone</button>
   <button class="btn" id="histBtn">Cronologia</button>
   <button class="btn" id="resetBtn">Reset</button>
 </header>
@@ -142,6 +151,16 @@
   <div class="drawer-body" id="histList"></div>
 </aside>
 
+<aside class="drawer people-drawer" id="peopleDrawer" aria-hidden="true">
+  <div class="drawer-head">
+    <span>Persone disponibili</span>
+    <button class="btn drawer-close" id="peopleClose" aria-label="Chiudi">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="people-grid" id="peopleGrid"></div>
+  </div>
+</aside>
+
 <div class="setup-banner" id="setupBanner" style="display:none">
   <b>Modalità solo-questo-browser.</b> Firebase non è ancora configurato, quindi le modifiche restano salvate solo su questo dispositivo e non sono condivise.
   Inserisci la configurazione Firebase in cima a <code>index.html</code> (oggetto <code>firebaseConfig</code>) per attivare la sincronizzazione condivisa in tempo reale.
@@ -153,12 +172,8 @@
     <div id="sectorGrids"></div>
   </section>
   <section class="section">
-    <div class="section-label">Attività interne</div>
+    <div class="section-label">Attività Center of Excellence</div>
     <div class="grid" id="grid-internal"></div>
-  </section>
-  <section class="section">
-    <div class="section-label">Persone</div>
-    <div class="people-grid" id="peopleGrid"></div>
   </section>
 </main>
 
@@ -202,7 +217,6 @@
     DF:"Domenico Fuoco", PM:"Pierfrancesco Mercuri"
   };
 
-  var EFFORT_LABEL = {1:"Basso", 2:"Medio", 3:"Alto"};
   var STATUS_OPTIONS = [
     {id:"early-stage", label:"early stage"},
     {id:"iniziata", label:"iniziata"},
@@ -247,11 +261,11 @@
     "Zhero MedLink":"industry-utilities",
     "CEF Energy SNAM-ENI":"industry-utilities",
     "FVG t33 - Attività B2, D":"pal-nord",
-    "Consorzio Bonifica Renana":"industry-utilities",
+    "Consorzio Bonifica Renana":"pal-nord",
     "Sponsorship FIFA-Lenovo POC":"sport-finance-culture",
     "FIP - PadelEconomy":"sport-finance-culture",
     "Comune di Policoro - Analisi scenari area industriale":"pac-pal-centro-sud",
-    "ENI brand valuation update":"enel-terna",
+    "ENI brand valuation update":"industry-utilities",
     "AIRI":"industry-utilities",
     "Interreg CE 28-34 Dashboard":"pal-nord",
     "Muzinich Climate Stress Test DIf II":"sport-finance-culture",
@@ -298,7 +312,7 @@
     var css="";
     PEOPLE.forEach(function(p){
       var base=hexToRgb(COLORS[p]);
-      css+='.disk[data-p="'+p+'"][data-eff]{background:'+COLORS[p]+';color:'+textFor(base)+';}\n';
+      css+='.disk[data-p="'+p+'"]{background:'+COLORS[p]+';color:'+textFor(base)+';}\n';
     });
     document.getElementById("diskColors").textContent=css;
   }
@@ -315,20 +329,15 @@
   // map activity id -> display name, for readable history lines
   var ACT_NAME={}; ACTS.forEach(function(a){ ACT_NAME[a.id]=a.name; });
   function locLabel(loc){ return loc==="source" ? "Disponibili" : (ACT_NAME[loc]||loc); }
-  function snapshot(){ return JSON.parse(JSON.stringify({placements:placements, efforts:efforts, statuses:statuses})); }
+  function snapshot(){ return JSON.parse(JSON.stringify({placements:placements, statuses:statuses})); }
 
-  // Build readable diff lines between two {placements,efforts} snapshots
+  // Build readable diff lines between two state snapshots
   function computeDiffLines(prev, curr){
     var out=[];
     Object.keys(curr.placements).forEach(function(id){
       var person=id.split("_")[0];
       var oldLoc=prev.placements?prev.placements[id]:undefined, newLoc=curr.placements[id];
       if(oldLoc!==undefined && oldLoc!==newLoc){ out.push(person+" · "+locLabel(oldLoc)+" → "+locLabel(newLoc)); }
-      var oldEff=prev.efforts?prev.efforts[id]:undefined, newEff=curr.efforts[id];
-      if(oldEff!==undefined && newEff!==undefined && oldEff!==newEff){
-        var ctx=(newLoc&&newLoc!=="source")?" ("+locLabel(newLoc)+")":"";
-        out.push(person+" · effort "+EFFORT_LABEL[oldEff]+"→"+EFFORT_LABEL[newEff]+ctx);
-      }
     });
     ACTS.forEach(function(activity){
       var oldStatus=(prev.statuses||{})[activity.id], newStatus=(curr.statuses||{})[activity.id];
@@ -342,7 +351,7 @@
   // Append a history entry for whatever changed since lastLoggedState
   function logHistory(){
     var lines=null;
-    if(resetFlag){ resetFlag=false; lines=["Reset completo — dischetti riportati e effort azzerato"]; }
+    if(resetFlag){ resetFlag=false; lines=["Reset completo — dischetti riportati tra le persone"]; }
     else if(lastLoggedState){ lines=computeDiffLines(lastLoggedState, snapshot()); }
     lastLoggedState=snapshot();
     if(lines && lines.length && historyRef){ try{ push(historyRef, {t:Date.now(), lines:lines}); }catch(e){ console.warn("[OE] history push failed:", e); } }
@@ -360,12 +369,12 @@
   function scheduleSave(){ setStatus("salvataggio…"); if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(doSave,200); }
 
   async function doSave(){
-    var snap = {placements:placements, efforts:efforts, statuses:statuses};
+    var snap = {placements:placements, statuses:statuses};
     lastPushed = JSON.stringify(snap);
     lsSet(lastPushed); // local copy regardless
     logHistory();      // record what changed since the last save
     if(stateRef){
-      try{ await set(stateRef, {placements:placements, efforts:efforts, statuses:statuses, updatedAt: Date.now()}); flashSaved("sincronizzato"); }
+      try{ await set(stateRef, {placements:placements, statuses:statuses, updatedAt: Date.now()}); flashSaved("sincronizzato"); }
       catch(e){ console.error("[OE] write failed:", e); setOffline("offline — salvato in locale", "Scrittura fallita: "+(e&&(e.code||e.message)||e)); }
     } else {
       flashSaved("salvato (solo questo browser)");
@@ -374,13 +383,11 @@
 
   function applyRemote(val){
     placements = val.placements || {};
-    efforts = val.efforts || {};
     statuses = val.statuses || {};
-    var cleaned=pruneRemovedPeople();
+    var cleaned=pruneRemovedPeople() || Object.prototype.hasOwnProperty.call(val, "efforts");
     var def = buildDefaults();
     Object.keys(def.placements).forEach(function(id){
       if(!(id in placements)) placements[id]="source";
-      if(!(id in efforts)) efforts[id]=2;
     });
     ACTS.forEach(function(activity){
       if(!STATUS_LABEL[statuses[activity.id]]){ statuses[activity.id]="early-stage"; cleaned=true; }
@@ -414,11 +421,11 @@
       var val = snapshot.val();
       if(!val || !val.placements){
         // database is empty → seed it with defaults from this client
-        if(!initialApplied){ var d=buildDefaults(); placements=d.placements; efforts=d.efforts; statuses=d.statuses; placeAllFromState(); initialApplied=true; }
+        if(!initialApplied){ var d=buildDefaults(); placements=d.placements; statuses=d.statuses; placeAllFromState(); initialApplied=true; }
         doSave();
         return;
       }
-      var incoming = JSON.stringify({placements:val.placements, efforts:val.efforts||{}, statuses:val.statuses||{}});
+      var incoming = JSON.stringify({placements:val.placements, statuses:val.statuses||{}});
       if(incoming === lastPushed){ initialApplied=true; return; } // our own write echoed back
       if(drag){ pendingRemote = val; return; }                   // don't disrupt an active drag
       var cleaned=applyRemote(val);
@@ -435,38 +442,35 @@
   function bootLocal(){
     var saved = lsGet();
     var def = buildDefaults();
-    if(saved && saved.placements){ placements=saved.placements; efforts=saved.efforts||{}; statuses=saved.statuses||{}; }
-    else { placements=def.placements; efforts=def.efforts; statuses=def.statuses; }
+    if(saved && saved.placements){ placements=saved.placements; statuses=saved.statuses||{}; }
+    else { placements=def.placements; statuses=def.statuses; }
     pruneRemovedPeople();
-    Object.keys(def.placements).forEach(function(id){ if(!(id in placements)) placements[id]="source"; if(!(id in efforts)) efforts[id]=2; });
+    Object.keys(def.placements).forEach(function(id){ if(!(id in placements)) placements[id]="source"; });
     ACTS.forEach(function(activity){ if(!STATUS_LABEL[statuses[activity.id]]) statuses[activity.id]="early-stage"; });
     placeAllFromState();
     lastLoggedState=snapshot();
+    lsSet(JSON.stringify(snapshot()));
     initialApplied=true;
   }
 
   // ---------- State ----------
   var placements = {};  // diskId -> 'source' | activity id (slug)
-  var efforts = {};     // diskId -> 1|2|3
   var statuses = {};    // activity id -> status id
   var diskEls = {};
 
   function buildDefaults(){
-    var pl={}, ef={}, st={};
+    var pl={}, st={};
     PEOPLE.forEach(function(person){
-      for(var k=0;k<DISKS_PER_PERSON;k++){ var id=diskId(person,k); pl[id]="source"; ef[id]=2; }
+      for(var k=0;k<DISKS_PER_PERSON;k++){ var id=diskId(person,k); pl[id]="source"; }
     });
     ACTS.forEach(function(activity){ st[activity.id]="early-stage"; });
-    return {placements:pl, efforts:ef, statuses:st};
+    return {placements:pl, statuses:st};
   }
 
   function pruneRemovedPeople(){
     var changed=false;
     Object.keys(placements).forEach(function(id){
       if(PEOPLE.indexOf(id.split("_")[0])===-1){ delete placements[id]; changed=true; }
-    });
-    Object.keys(efforts).forEach(function(id){
-      if(PEOPLE.indexOf(id.split("_")[0])===-1){ delete efforts[id]; changed=true; }
     });
     return changed;
   }
@@ -478,7 +482,6 @@
     d.className="disk";
     d.setAttribute("data-p",person);
     d.setAttribute("data-id",id);
-    d.setAttribute("data-eff", String(efforts[id]||2));
     d.textContent=person;
     d.style.animationDelay=(Math.random()*-3.4).toFixed(2)+"s";
     updateTitle(d);
@@ -486,9 +489,9 @@
     return d;
   }
   function updateTitle(d){
-    var p=d.getAttribute("data-p"); var e=d.getAttribute("data-eff");
+    var p=d.getAttribute("data-p");
     var nm=NAMES[p] ? NAMES[p] : p;
-    d.title=nm+" · effort "+EFFORT_LABEL[e];
+    d.title=nm;
   }
 
   function buildActivities(){
@@ -536,26 +539,17 @@
     return document.querySelector('[data-holder="'+loc+'"]');
   }
 
-  function resortPod(person){
-    var pod=document.querySelector('[data-pod-disks="'+person+'"]');
-    var arr=Array.prototype.slice.call(pod.querySelectorAll(".disk"));
-    arr.sort(function(a,b){ return (+a.getAttribute("data-eff")) - (+b.getAttribute("data-eff")); });
-    arr.forEach(function(d){ pod.appendChild(d); });
-  }
-
   function placeAllFromState(){
     Object.keys(diskEls).forEach(function(id){ var e=diskEls[id]; if(e.parentNode) e.parentNode.removeChild(e); });
     diskEls={};
     PEOPLE.forEach(function(person){
       for(var k=0;k<DISKS_PER_PERSON;k++){
         var id=diskId(person,k);
-        if(!(id in efforts)) efforts[id]=2;
         var el=makeDisk(person,k); diskEls[id]=el;
         var loc=placements[id]||"source"; placements[id]=loc;
         var h=holderFor(loc,person); if(!h){ h=holderFor("source",person); placements[id]="source"; }
         h.appendChild(el);
       }
-      resortPod(person);
     });
     refreshAllCounts();
   }
@@ -566,12 +560,12 @@
       var card=holder.closest(".activity"), select=card.querySelector("[data-status-select]");
       select.value=statuses[id]||"early-stage"; card.setAttribute("data-status", select.value);
       var disks=holder.querySelectorAll(".disk");
-      var ppl={}, eff=0;
-      disks.forEach(function(d){ ppl[d.getAttribute("data-p")]=1; eff+=(+d.getAttribute("data-eff")); });
+      var ppl={};
+      disks.forEach(function(d){ ppl[d.getAttribute("data-p")]=1; });
       var nPeople=Object.keys(ppl).length;
       var badge=card.querySelector("[data-badge]");
       if(disks.length===0){ badge.className="chip empty"; badge.textContent="vuoto"; holder.classList.add("empty"); }
-      else{ holder.classList.remove("empty"); badge.className="chip"; badge.textContent=nPeople+" pers · effort "+eff; }
+      else{ holder.classList.remove("empty"); badge.className="chip"; badge.textContent=nPeople+" pers"; }
     });
     PEOPLE.forEach(function(person){
       var pod=document.querySelector('[data-pod-disks="'+person+'"]');
@@ -585,7 +579,7 @@
     });
   }
 
-  // ---------- Drag & drop + tap-to-cycle effort ----------
+  // ---------- Drag & drop ----------
   var drag=null, lastZone=null;
   function attachDrag(el){ el.addEventListener("pointerdown", onDown); }
 
@@ -619,14 +613,6 @@
   function autoScroll(y){ var m=80, vh=window.innerHeight;
     if(y<m) window.scrollBy(0,-Math.ceil((m-y)/5)); else if(y>vh-m) window.scrollBy(0,Math.ceil((y-(vh-m))/5)); }
 
-  function cycleEffort(el){
-    var id=el.getAttribute("data-id");
-    var cur=+el.getAttribute("data-eff"); var next=(cur%3)+1;
-    efforts[id]=next; el.setAttribute("data-eff",String(next)); updateTitle(el);
-    if(placements[id]==="source") resortPod(el.getAttribute("data-p"));
-    refreshAllCounts(); scheduleSave();
-  }
-
   function onUp(e){
     if(!drag) return;
     var el=drag.el;
@@ -634,7 +620,7 @@
     el.removeEventListener("pointerup", onUp);
     el.removeEventListener("pointercancel", onUp);
 
-    if(!drag.moved){ cleanupDrag(); cycleEffort(el); maybeApplyPending(); return; }
+    if(!drag.moved){ cleanupDrag(); maybeApplyPending(); return; }
 
     var zone=zoneAt(e.clientX,e.clientY);
     if(lastZone){ lastZone.classList.remove("dropok"); lastZone=null; }
@@ -646,7 +632,6 @@
     }else{ target=drag.origin; }
     el.classList.remove("dragging"); el.style.left=""; el.style.top=""; el.style.width=""; el.style.height="";
     target.appendChild(el);
-    if(placements[id]==="source") resortPod(person);
     cleanupDrag(); refreshAllCounts(); scheduleSave();
     maybeApplyPending();
   }
@@ -659,15 +644,15 @@
   function maybeApplyPending(){
     if(pendingRemote && !drag){
       var val=pendingRemote; pendingRemote=null;
-      var incoming = JSON.stringify({placements:val.placements, efforts:val.efforts||{}, statuses:val.statuses||{}});
+      var incoming = JSON.stringify({placements:val.placements, statuses:val.statuses||{}});
       if(incoming !== lastPushed && applyRemote(val)) scheduleSave();
     }
   }
 
   // ---------- Controls ----------
   document.getElementById("resetBtn").addEventListener("click", function(){
-    if(!confirm("Riportare tutti i dischetti nei contenitori delle persone e azzerare l'effort? Questo aggiorna lo stato condiviso per tutti.")) return;
-    var d=buildDefaults(); placements=d.placements; efforts=d.efforts; resetFlag=true; placeAllFromState(); scheduleSave();
+    if(!confirm("Riportare tutti i dischetti nei contenitori delle persone? Questo aggiorna lo stato condiviso per tutti.")) return;
+    var d=buildDefaults(); placements=d.placements; statuses=d.statuses; resetFlag=true; placeAllFromState(); scheduleSave();
   });
 
   // ---------- Cronologia drawer ----------
@@ -690,12 +675,39 @@
   }
   function escapeHtml(s){ return String(s).replace(/[&<>"]/g,function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
 
-  function openDrawer(){ document.getElementById("histDrawer").classList.add("open"); document.getElementById("histDrawer").setAttribute("aria-hidden","false"); document.getElementById("histOverlay").classList.add("open"); }
-  function closeDrawer(){ document.getElementById("histDrawer").classList.remove("open"); document.getElementById("histDrawer").setAttribute("aria-hidden","true"); document.getElementById("histOverlay").classList.remove("open"); }
-  document.getElementById("histBtn").addEventListener("click", openDrawer);
-  document.getElementById("histClose").addEventListener("click", closeDrawer);
-  document.getElementById("histOverlay").addEventListener("click", closeDrawer);
-  document.addEventListener("keydown", function(e){ if(e.key==="Escape") closeDrawer(); });
+  function setDrawer(id, open){
+    var drawer=document.getElementById(id);
+    drawer.classList.toggle("open", open);
+    drawer.setAttribute("aria-hidden", String(!open));
+  }
+  function closeDrawers(){
+    setDrawer("histDrawer", false);
+    setDrawer("peopleDrawer", false);
+    document.getElementById("histOverlay").classList.remove("open");
+    document.getElementById("peopleBtn").setAttribute("aria-expanded", "false");
+  }
+  function openHistory(){
+    setDrawer("peopleDrawer", false);
+    setDrawer("histDrawer", true);
+    document.getElementById("histOverlay").classList.add("open");
+    document.getElementById("peopleBtn").setAttribute("aria-expanded", "false");
+  }
+  function openPeople(){
+    setDrawer("histDrawer", false);
+    setDrawer("peopleDrawer", true);
+    // Leave the dashboard interactive so disks can be dragged from the menu to any activity.
+    document.getElementById("histOverlay").classList.remove("open");
+    document.getElementById("peopleBtn").setAttribute("aria-expanded", "true");
+  }
+  document.getElementById("histBtn").addEventListener("click", openHistory);
+  document.getElementById("histClose").addEventListener("click", closeDrawers);
+  document.getElementById("peopleBtn").addEventListener("click", function(){
+    if(document.getElementById("peopleDrawer").classList.contains("open")) closeDrawers();
+    else openPeople();
+  });
+  document.getElementById("peopleClose").addEventListener("click", closeDrawers);
+  document.getElementById("histOverlay").addEventListener("click", closeDrawers);
+  document.addEventListener("keydown", function(e){ if(e.key==="Escape") closeDrawers(); });
 
   // ---------- Init ----------
   buildDiskColours();
