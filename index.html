@@ -110,6 +110,7 @@
   .drawer.open{ transform:translateX(0); }
   .people-drawer{ left:0; right:auto; width:min(430px,92vw); transform:translateX(-100%); box-shadow:8px 0 30px rgba(0,0,0,.18); }
   .people-drawer.open{ transform:translateX(0); }
+  .people-drawer.drag-source{ visibility:hidden; pointer-events:none; }
   .people-drawer .drawer-body{ padding:16px 18px 30px; }
   .people-drawer .people-grid{ grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); }
   .drawer-head{ display:flex; align-items:center; gap:12px; padding:15px 18px; background:var(--bluette-900); color:var(--white);
@@ -237,7 +238,6 @@
 
   var MARKET = [
     "Zhero MedLink",
-    "CEF Energy SNAM-ENI",
     "FVG t33 - Attività B2, D",
     "Consorzio Bonifica Renana",
     "Sponsorship FIFA-Lenovo POC",
@@ -250,16 +250,16 @@
     "Terna Update Impatto",
     "Muzinich Mloan",
     "Compagnia San Paolo",
-    "DD Pjswitch",
     "Progetti Monte Acuto - KI",
     "Rendicontazione DNSH",
     "AGEA",
     "CDP Venture Capital",
+    "CDP Valutazioni d'impatto",
+    "CDP Environmental and Climate Risk",
     {name:"UT- Corridoio Trans Mediterraneo", id:"act-uniontrasporti"}
   ];
   var MARKET_SECTORS = {
     "Zhero MedLink":"industry-utilities",
-    "CEF Energy SNAM-ENI":"industry-utilities",
     "FVG t33 - Attività B2, D":"pal-nord",
     "Consorzio Bonifica Renana":"pal-nord",
     "Sponsorship FIFA-Lenovo POC":"sport-finance-culture",
@@ -272,11 +272,12 @@
     "Terna Update Impatto":"enel-terna",
     "Muzinich Mloan":"sport-finance-culture",
     "Compagnia San Paolo":"sport-finance-culture",
-    "DD Pjswitch":"sport-finance-culture",
     "Progetti Monte Acuto - KI":"pac-pal-centro-sud",
     "Rendicontazione DNSH":"enel-terna",
     "AGEA":"pac-pal-centro-sud",
     "CDP Venture Capital":"sport-finance-culture",
+    "CDP Valutazioni d'impatto":"sport-finance-culture",
+    "CDP Environmental and Climate Risk":"sport-finance-culture",
     "act-uniontrasporti":"sport-finance-culture"
   };
   var INTERNAL = [
@@ -600,6 +601,11 @@
     if(!drag.moved && (Math.abs(dx)+Math.abs(dy)>4)){
       drag.moved=true; drag.el.classList.add("dragging");
       drag.el.style.width=drag.w+"px"; drag.el.style.height=drag.h+"px";
+      // Escape the drawer's transformed, scrollable container before hiding it.
+      var fromPeople=!!drag.el.closest("#peopleDrawer");
+      document.body.appendChild(drag.el);
+      drag.el.setPointerCapture(e.pointerId);
+      if(fromPeople) document.getElementById("peopleDrawer").classList.add("drag-source");
     }
     if(!drag.moved) return;
     drag.el.style.left=(e.clientX-drag.offsetX)+"px";
@@ -622,7 +628,7 @@
 
     if(!drag.moved){ cleanupDrag(); maybeApplyPending(); return; }
 
-    var zone=zoneAt(e.clientX,e.clientY);
+    var zone=e.type==="pointercancel" ? null : zoneAt(e.clientX,e.clientY);
     if(lastZone){ lastZone.classList.remove("dropok"); lastZone=null; }
     var person=el.getAttribute("data-p"); var id=el.getAttribute("data-id"); var target;
     if(zone){
@@ -636,6 +642,7 @@
     maybeApplyPending();
   }
   function cleanupDrag(){
+    document.getElementById("peopleDrawer").classList.remove("drag-source");
     if(drag && drag.el){ drag.el.classList.remove("dragging"); drag.el.style.left=""; drag.el.style.top=""; drag.el.style.width=""; drag.el.style.height=""; }
     if(lastZone){ lastZone.classList.remove("dropok"); lastZone=null; }
     drag=null;
