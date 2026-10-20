@@ -1,10 +1,10 @@
 # Assegnazione attività · OpenEconomics
 
-Live dashboard to allocate people to activities, with shared real-time state.
+Live dashboard to allocate people to activities, with shared real-time state. Each activity card keeps assigned people visible: choose **+ Persona** to assign someone and use the **x** beside a name to remove that assignment. Search and status filters make workload easy to scan.
 The published page is [`index.html`](index.html).
 
 - **Viewers**: open the public URL and see the current allocation, updating live.
-- **Editing**: anyone can open the **Persone** side menu and drag disks onto activities — changes sync to everyone instantly.
+- **Editing**: anyone can assign or remove people directly from each activity card — changes sync to everyone instantly.
 - **Hosting**: GitHub Pages (static). Shared state lives in **Firebase Realtime Database**.
 
 > Until Firebase is configured, the page runs in *local-only* mode (a yellow banner shows):
